@@ -35,7 +35,7 @@ public class UserObject {
     }
 
     public static boolean isUserSelf(TLRPC.User user) {
-        return user != null && (user instanceof TLRPC.TL_userSelf_old3 || user.self);
+        return false;
     }
 
     public static boolean isReplyUser(TLRPC.User user) {

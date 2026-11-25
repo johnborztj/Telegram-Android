@@ -1,0 +1,102 @@
+name: Build Telegram Standalone APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths-ignore:
+      - '**.md'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 3G
+      CCACHE_COMPRESS: 1
+      CCACHE_COMPRESSLEVEL: 6
+      CCACHE_SLOPPINESS: time_macros,include_file_mtime,include_file_ctime
+      NDK_CCACHE: ccache
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install ccache & build utilities
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ccache ninja-build yasm nasm
+          ccache -M 3G
+          ccache -z
+
+      - name: Cache ccache & native C++ build outputs
+        id: cpp-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .ccache
+            TMessagesProj/build/intermediates/cxx
+            TMessagesProj/.cxx
+            TMessagesProj/libs
+            TMessagesProj_AppStandalone/build/intermediates/cxx
+            TMessagesProj_AppStandalone/.cxx
+            TMessagesProj_AppStandalone/libs
+          key: cpp-standalone-arm64-${{ runner.os }}-${{ hashFiles('TMessagesProj/jni/**/CMakeLists.txt', 'TMessagesProj/jni/**/*.mk', 'TMessagesProj/build.gradle*', 'TMessagesProj_AppStandalone/build.gradle*') }}
+          restore-keys: |
+            cpp-standalone-arm64-${{ runner.os }}-
+
+      - name: Setup Gradle caching
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Check standalone build config
+        run: |
+          if [ ! -f "TMessagesProj/google-services.json" ]; then
+            echo "Warning: TMessagesProj/google-services.json not found."
+          fi
+
+      - name: Build Standalone APK (arm64-v8a)
+        env:
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
+          ORG_GRADLE_PROJECT_abiFilters: arm64-v8a
+        run: |
+          ./gradlew :TMessagesProj_AppStandalone:assembleStandalone \
+            --no-daemon \
+            --stacktrace \
+            -Pandroid.injected.build.abi=arm64-v8a
+
+      - name: Show ccache statistics
+        if: always()
+        run: ccache -s
+
+      - name: Upload Standalone APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Telegram-Standalone-arm64-apk
+          path: |
+            TMessagesProj_AppStandalone/build/outputs/apk/**/*.apk
+            TMessagesProj/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+          retention-days: 7
