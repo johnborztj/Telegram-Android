@@ -1,4 +1,4 @@
-name: Build Telegram Standalone APK
+name: Build APK
 
 on:
   push:
@@ -9,113 +9,40 @@ on:
       - '**.md'
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
 
     env:
-      CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_MAXSIZE: 3G
-      CCACHE_COMPRESS: 1
-      CCACHE_COMPRESSLEVEL: 6
-      CCACHE_SLOPPINESS: time_macros,include_file_mtime,include_file_ctime
-      NDK_CCACHE: ccache
-      APK_OUTPUT_DIR: ${{ github.workspace }}/dist
+      APK_DIR: ${{ github.workspace }}/apk-out
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          fetch-depth: 1
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: temurin
+          java-version: 17
 
-      - name: Install ccache & build utilities
+      - name: Build APK
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ccache ninja-build yasm nasm
-          ccache -M 3G
-          ccache -z
-
-      - name: Cache ccache & native C++ build outputs
-        id: cpp-cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            .ccache
-            TMessagesProj/build/intermediates/cxx
-            TMessagesProj/.cxx
-            TMessagesProj/libs
-            TMessagesProj_AppStandalone/build/intermediates/cxx
-            TMessagesProj_AppStandalone/.cxx
-            TMessagesProj_AppStandalone/libs
-          key: cpp-standalone-arm64-${{ runner.os }}-${{ hashFiles('TMessagesProj/jni/**/CMakeLists.txt', 'TMessagesProj/jni/**/*.mk', 'TMessagesProj/build.gradle*', 'TMessagesProj_AppStandalone/build.gradle*') }}
-          restore-keys: |
-            cpp-standalone-arm64-${{ runner.os }}-
-
-      - name: Setup Gradle caching
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-read-only: false
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Check standalone build config
-        run: |
-          if [ ! -f "TMessagesProj/google-services.json" ]; then
-            echo "Warning: TMessagesProj/google-services.json not found."
-          fi
-
-      - name: Build Standalone APK (arm64-v8a)
-        env:
-          CMAKE_C_COMPILER_LAUNCHER: ccache
-          CMAKE_CXX_COMPILER_LAUNCHER: ccache
-          ORG_GRADLE_PROJECT_abiFilters: arm64-v8a
-        run: |
+          chmod +x gradlew
+          mkdir -p "$APK_DIR"
           ./gradlew :TMessagesProj_AppStandalone:assembleStandalone \
             --no-daemon \
-            --stacktrace \
+            -PapkOutputDir="$APK_DIR" \
             -Pandroid.injected.build.abi=arm64-v8a
+          find . -not -path "./apk-out/*" -not -path "./.git/*" -type f -name "*.apk" -exec cp -v {} "$APK_DIR/" \;
+          ls -lh "$APK_DIR"
 
-      - name: Copy built APKs to specific path (dist/)
-        if: always()
-        run: |
-          mkdir -p "$APK_OUTPUT_DIR"
-          echo "Searching for generated APKs..."
-          FOUND_APKS=$(find . -path "*/build/outputs/apk/*" -name "*.apk" 2>/dev/null || true)
-          if [ -z "$FOUND_APKS" ]; then
-            echo "No .apk files found under any build/outputs/apk/ directory."
-            ls -la dist/
-            exit 1
-          fi
-          echo "Found APKs:"
-          echo "$FOUND_APKS"
-          while IFS= read -r apk; do
-            cp -v "$apk" "$APK_OUTPUT_DIR/"
-          done <<< "$FOUND_APKS"
-          echo "Files in $APK_OUTPUT_DIR:"
-          ls -lh "$APK_OUTPUT_DIR"
-
-      - name: Show ccache statistics
-        if: always()
-        run: ccache -s
-
-      - name: Upload APK from specific path
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Telegram-Standalone-arm64-apk
-          path: dist/*.apk
+          name: apk-out
+          path: apk-out/*.apk
           if-no-files-found: error
-          retention-days: 7
 
