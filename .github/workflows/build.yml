@@ -25,6 +25,7 @@ jobs:
       CCACHE_COMPRESSLEVEL: 6
       CCACHE_SLOPPINESS: time_macros,include_file_mtime,include_file_ctime
       NDK_CCACHE: ccache
+      APK_OUTPUT_DIR: ${{ github.workspace }}/dist
 
     steps:
       - name: Checkout repository
@@ -87,16 +88,34 @@ jobs:
             --stacktrace \
             -Pandroid.injected.build.abi=arm64-v8a
 
+      - name: Copy built APKs to specific path (dist/)
+        if: always()
+        run: |
+          mkdir -p "$APK_OUTPUT_DIR"
+          echo "Searching for generated APKs..."
+          FOUND_APKS=$(find . -path "*/build/outputs/apk/*" -name "*.apk" 2>/dev/null || true)
+          if [ -z "$FOUND_APKS" ]; then
+            echo "No .apk files found under any build/outputs/apk/ directory."
+            ls -la dist/
+            exit 1
+          fi
+          echo "Found APKs:"
+          echo "$FOUND_APKS"
+          while IFS= read -r apk; do
+            cp -v "$apk" "$APK_OUTPUT_DIR/"
+          done <<< "$FOUND_APKS"
+          echo "Files in $APK_OUTPUT_DIR:"
+          ls -lh "$APK_OUTPUT_DIR"
+
       - name: Show ccache statistics
         if: always()
         run: ccache -s
 
-      - name: Upload Standalone APK artifact
+      - name: Upload APK from specific path
         uses: actions/upload-artifact@v4
         with:
           name: Telegram-Standalone-arm64-apk
-          path: |
-            TMessagesProj_AppStandalone/build/outputs/apk/**/*.apk
-            TMessagesProj/build/outputs/apk/**/*.apk
+          path: dist/*.apk
           if-no-files-found: error
           retention-days: 7
+
