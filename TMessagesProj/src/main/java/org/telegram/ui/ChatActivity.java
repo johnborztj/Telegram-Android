@@ -1287,6 +1287,7 @@ public class ChatActivity extends BaseFragment implements
     public final static int OPTION_GIFT = 108;
     public final static int OPTION_EDIT_TODO = 109;
     public final static int OPTION_ADD_TO_TODO = 110;
+    public final static int OPTION_FAV_MESSAGE = 119;
 
     public final static int OPTION_SUGGESTION_EDIT_PRICE = 111;
     public final static int OPTION_SUGGESTION_EDIT_TIME = 112;
@@ -1685,6 +1686,7 @@ public class ChatActivity extends BaseFragment implements
     private final static int share_contact = 17;
     private final static int mute = 18;
     private final static int report = 21;
+    private final static int fav_messages_menu = 505;
     private final static int star = 22;
     private final static int edit = 23;
     private final static int add_shortcut = 24;
@@ -3718,6 +3720,29 @@ public class ChatActivity extends BaseFragment implements
                 if (id != chat_menu_options && id != chat_menu_topics_panel && id != -1 && topicsPanel != null && topicsPanel.isOpen()) {
                     topicsPanel.close();
                 }
+                if (id == fav_messages_menu) {
+                    if (currentChat != null) {
+                        java.util.List<org.telegram.messenger.FavMessagesHelper.FavItem> favs =
+                            org.telegram.messenger.FavMessagesHelper.getFavorites(currentAccount, dialog_id);
+                        if (favs.isEmpty()) {
+                            BulletinFactory.of(ChatActivity.this).createSimpleBulletin(R.drawable.msg_fave, "No favorite messages in this group").show();
+                        } else {
+                            CharSequence[] titles = new CharSequence[favs.size()];
+                            for (int i = 0; i < favs.size(); i++) {
+                                titles[i] = favs.get(i).preview;
+                            }
+                            AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+                            builder.setTitle("Fav Messages");
+                            builder.setItems(titles, (dialog, which) -> {
+                                if (which >= 0 && which < favs.size()) {
+                                    scrollToMessageId(favs.get(which).messageId, 0, true, 0, true, 0);
+                                }
+                            });
+                            showDialog(builder.create());
+                        }
+                    }
+                    return;
+                }
                 if (id == -1) {
                     if (isInPollAddOptionMode()) {
                         pollAddOptionModeClose();
@@ -4397,6 +4422,9 @@ public class ChatActivity extends BaseFragment implements
 
             if (searchItem != null) {
                 headerItem.lazilyAddSubItem(search, R.drawable.msg_search, LocaleController.getString(R.string.Search));
+                if (currentChat != null) {
+                    headerItem.lazilyAddSubItem(fav_messages_menu, R.drawable.msg_fave, "Fav Messages");
+                }
             }
             if (ChatObject.isBoostSupported(currentChat) && (getUserConfig().isPremium() || ChatObject.isBoosted(chatInfo) || ChatObject.hasAdminRights(currentChat))) {
                 RLottieDrawable drawable = new RLottieDrawable(R.raw.boosts, dp(24), dp(24));
@@ -35065,6 +35093,14 @@ public class ChatActivity extends BaseFragment implements
                 break;
             }
             case OPTION_EDIT_TODO:
+            case OPTION_FAV_MESSAGE: {
+                if (currentChat != null && selectedObject != null) {
+                    boolean nowFav = org.telegram.messenger.FavMessagesHelper.toggleFavorite(currentAccount, dialog_id, selectedObject);
+                    String msgText = nowFav ? "Message added to favorites" : "Message removed from favorites";
+                    BulletinFactory.of(ChatActivity.this).createSimpleBulletin(R.drawable.msg_fave, msgText).show();
+                }
+                break;
+            }
             case OPTION_ADD_TO_TODO: {
                 if (!getUserConfig().isPremium()) {
                     showDialog(new PremiumFeatureBottomSheet(ChatActivity.this, PremiumPreviewFragment.PREMIUM_FEATURE_TODO, false));
