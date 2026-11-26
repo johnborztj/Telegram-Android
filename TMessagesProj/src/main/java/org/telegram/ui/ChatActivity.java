@@ -46614,12 +46614,6 @@ public class ChatActivity extends BaseFragment implements
                     options.add(OPTION_REPLY);
                     icons.add(R.drawable.menu_reply);
                 }
-                if (currentChat != null && selectedObject != null) {
-                    boolean isFav = org.telegram.messenger.FavMessagesHelper.isFavorite(currentAccount, dialog_id, selectedObject.getId());
-                    items.add(isFav ? "Unfav Message" : "Fav Message");
-                    options.add(OPTION_FAV_MESSAGE);
-                    icons.add(R.drawable.msg_fave);
-                }
                 if (!isThreadChat() && chatMode != MODE_SCHEDULED && primaryMessage != null && primaryMessage.hasReplies() && currentChat.megagroup && primaryMessage.canViewThread()) {
                     items.add(LocaleController.formatPluralString("ViewReplies", primaryMessage.getRepliesCount()));
                     options.add(OPTION_VIEW_REPLIES_OR_THREAD);
@@ -46723,6 +46717,12 @@ public class ChatActivity extends BaseFragment implements
                     items.add(LocaleController.getString(R.string.Reply));
                     options.add(OPTION_REPLY);
                     icons.add(R.drawable.menu_reply);
+                }
+                if (currentChat != null && selectedObject != null) {
+                    boolean isFav = org.telegram.messenger.FavMessagesHelper.isFavorite(currentAccount, dialog_id, selectedObject.getId());
+                    items.add(isFav ? "Unfav Message" : "Fav Message");
+                    options.add(OPTION_FAV_MESSAGE);
+                    icons.add(R.drawable.msg_fave);
                 }
                 if ((selectedObject.type == MessageObject.TYPE_TEXT || selectedObject.type == MessageObject.TYPE_ARTICLE || selectedObject.isDice() || selectedObject.isAnimatedEmoji() || selectedObject.isAnimatedEmojiStickers() || getMessageCaption(selectedObject, selectedObjectGroup) != null) && (!noforwardsOrPaidMedia || isEphemeral) && !selectedObject.sponsoredCanReport) {
                     items.add(LocaleController.getString(R.string.Copy));
