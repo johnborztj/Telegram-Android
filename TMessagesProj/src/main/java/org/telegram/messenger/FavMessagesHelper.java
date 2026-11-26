@@ -130,7 +130,7 @@ public class FavMessagesHelper {
         if (msg.isSticker()) {
             return "[Sticker]";
         }
-        if (msg.isAnyDocument()) {
+        if (msg.getDocument() != null) {
             return "[File]";
         }
         return "Message #" + msg.getId();
