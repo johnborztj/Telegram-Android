@@ -65,7 +65,11 @@ public class UserObject {
                 return LocaleController.getString(R.string.BotTypeAI);
             } else if (lower.endsWith("gay")) {
                 return LocaleController.getString(R.string.BotTypeNonBinary);
+            } else if (lower.endsWith("t")) {
+                return "tester";
             }
+        }
+
         }
         return LocaleController.getString(R.string.Bot);
     }
